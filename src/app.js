@@ -49,6 +49,7 @@
   var dragLast = [0, 0];
   var dragStart = [0, 0];
   var decadeBars = [];
+  var chartH = 90;
 
   // ---------- small helpers (safe DOM only: textContent, never innerHTML) ----------
 
@@ -354,11 +355,13 @@
 
     panel.appendChild(filters);
 
-    var dec = h('section', 'group');
+    var dec = h('section', 'group decade-group');
     dec.appendChild(h('h2', 'group-title', 'Quakes per decade'));
-    ui.decades = svgEl('svg', { 'class': 'decades', viewBox: '0 0 300 70', role: 'img' });
+    ui.decWrap = h('div', 'decade-wrap');
+    ui.decades = svgEl('svg', { 'class': 'decades', viewBox: '0 0 300 90', role: 'img' });
     ui.decades.setAttribute('aria-label', 'Number of earthquakes recorded in each decade');
-    dec.appendChild(ui.decades);
+    ui.decWrap.appendChild(ui.decades);
+    dec.appendChild(ui.decWrap);
     dec.appendChild(h('p', 'muted',
       'Click a bar to filter. Early decades are undercounted.'));
     panel.appendChild(dec);
@@ -372,7 +375,10 @@
     main.appendChild(ui.stage);
     main.appendChild(panel);
 
-    ui.foot = h('footer', 'foot', 'Source: USGS Earthquake Hazards Program catalog. Created by Waqar Ahmed Shaikh.');
+    ui.foot = h('footer', 'foot');
+    ui.footSource = h('span', 'foot-source', 'Source: USGS Earthquake Hazards Program catalog.');
+    ui.foot.appendChild(ui.footSource);
+    ui.foot.appendChild(h('span', 'foot-credit', 'Created by Waqar Ahmed Shaikh'));
 
     shell.appendChild(top);
     shell.appendChild(main);
@@ -509,13 +515,14 @@
     var max = 1;
     decs.forEach(function (k) { if (counts[k] > max) { max = counts[k]; } });
 
+    ui.decades.setAttribute('viewBox', '0 0 300 ' + chartH);
     ui.decades.textContent = '';
     decadeBars = [];
     var left = 6;
     var width = 288;
     var step = width / decs.length;
-    var base = 54;
-    var tall = 44;
+    var base = chartH - 16;
+    var tall = chartH - 28;
     decs.forEach(function (dec, k) {
       var bh = Math.max(1, Math.round(tall * counts[dec] / max));
       var rect = svgEl('rect', {
@@ -539,12 +546,24 @@
       ui.decades.appendChild(rect);
       decadeBars.push({ dec: dec, rect: rect });
       if (k % 3 === 0) {
-        var label = svgEl('text', { x: String(left + k * step), y: '67', 'class': 'axis-label' });
+        var label = svgEl('text', { x: String(left + k * step), y: String(chartH - 3), 'class': 'axis-label' });
         label.textContent = String(dec);
         ui.decades.appendChild(label);
       }
     });
     paintDecades();
+  }
+
+  // The decade chart fills whatever height the panel has left, so it grows when space allows.
+  function fitChart() {
+    if (!ui.decWrap) { return; }
+    var w = ui.decWrap.clientWidth;
+    var hgt = ui.decWrap.clientHeight;
+    if (!w || !hgt) { return; }
+    var next = clamp(Math.round(300 * hgt / w), 70, 230);
+    if (Math.abs(next - chartH) < 3) { return; }
+    chartH = next;
+    rebuildDecades();
   }
 
   function paintDecades() {
@@ -785,6 +804,7 @@
 
     if (typeof ResizeObserver !== 'undefined') {
       new ResizeObserver(resize).observe(ui.stage);
+      new ResizeObserver(fitChart).observe(ui.decWrap);
     } else {
       window.addEventListener('resize', resize);
     }
@@ -817,10 +837,10 @@
     rebuildDecades();
     refreshStats();
     showDetail();
-    ui.foot.textContent = 'Source: USGS Earthquake Hazards Program catalog, earthquakes of magnitude 6 and above from 1900 to today. ' +
+    ui.footSource.textContent = 'Source: USGS Earthquake Hazards Program catalog, earthquakes of magnitude 6 and above from 1900 to today. ' +
       fmt(state.quakes.length) + ' events loaded ' + state.loadedAt.toLocaleString() +
       (state.skipped ? ' (' + state.skipped + ' rows skipped for missing values)' : '') +
-      '. Map data: Natural Earth. Created by Waqar Ahmed Shaikh.';
+      '. Map data: Natural Earth.';
     dirty = true;
   }
 
